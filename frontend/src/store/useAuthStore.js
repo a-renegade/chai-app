@@ -2,6 +2,7 @@ import {create} from "zustand";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 export const useAuthStore= create((set,get)=>({
+    fullName:null,
     authUser:null,
     userType:null,
     isSigningUp:false,
@@ -15,6 +16,7 @@ export const useAuthStore= create((set,get)=>({
             
             
             set({ 
+                fullName: res.data.fullName,
                 authUser : res.data.userEmail,
                 userType : res.data.userType,
                 userReferenceId : res.data.userReferenceId,

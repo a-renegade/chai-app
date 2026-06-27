@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { axiosInstance } from "../lib/axios";
+import { useAuthStore } from "../store/useAuthStore";
+import ReviewList from "../components/ReviewList";
+import ReviewForm from "../components/ReviewForm";
 
 const formatRating = (rating) => {
   const numericRating = Number(rating);
@@ -14,27 +17,43 @@ const formatRating = (rating) => {
 
 export default function ShopPage() {
   const { shopId } = useParams();
+  const { authUser } = useAuthStore();
+
   const [shop, setShop] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [showReviewForm, setShowReviewForm] = useState(false);
+
+  const fetchReviews = useCallback(async () => {
+    try {
+      const res = await axiosInstance.get(`/review/${shopId}`);
+      setReviews(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.log(err);
+    }
+  }, [shopId]);
+
+  const fetchShop = useCallback(async () => {
+    try {
+      const res = await axiosInstance.get(`/shop/${shopId}`);
+      setShop(res.data);
+    } catch (err) {
+      throw err;
+    }
+  }, [shopId]);
+
   useEffect(() => {
-    const fetchShopData = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError("");
 
-        const [shopResponse, reviewsResponse] = await Promise.all([
-          axiosInstance.get(`/shop/${shopId}`),
-          axiosInstance.get(`/review/${shopId}`),
-        ]);
-
-        setShop(shopResponse.data);
-        setReviews(Array.isArray(reviewsResponse.data) ? reviewsResponse.data : []);
+        await Promise.all([fetchShop(), fetchReviews()]);
       } catch (err) {
         setError(
-          err?.response?.data?.message ||
+          err.response?.data?.message ||
             "Unable to load this shop right now."
         );
       } finally {
@@ -42,21 +61,22 @@ export default function ShopPage() {
       }
     };
 
-    if (shopId) {
-      fetchShopData();
-    }
-  }, [shopId]);
+    fetchData();
+  }, [fetchShop, fetchReviews]);
 
-  const averageRating = useMemo(
-    () => formatRating(shop?.averageRating ?? shop?.rating),
-    [shop]
-  );
+  const userReview = useMemo(() => {
+    return reviews.find((review) => review.email === authUser);
+  }, [reviews, authUser]);
+
+  const averageRating = useMemo(() => {
+    return formatRating(shop?.averageRating);
+  }, [shop]);
 
   if (loading) {
     return (
       <main className="min-h-[calc(100vh-64px)] bg-gray-100 p-6">
         <div className="mx-auto max-w-4xl rounded-lg bg-white p-8 shadow-sm">
-          <p className="text-gray-600">Loading shop...</p>
+          Loading...
         </div>
       </main>
     );
@@ -66,9 +86,12 @@ export default function ShopPage() {
     return (
       <main className="min-h-[calc(100vh-64px)] bg-gray-100 p-6">
         <div className="mx-auto max-w-4xl rounded-lg bg-white p-8 shadow-sm">
-          <p className="mb-4 text-red-600">{error || "Shop not found."}</p>
-          <Link className="font-medium text-amber-700 hover:text-amber-800" to="/">
-            Back to shops
+          <p className="text-red-500 mb-4">
+            {error || "Shop not found"}
+          </p>
+
+          <Link to="/" className="text-amber-700">
+            Back
           </Link>
         </div>
       </main>
@@ -78,62 +101,75 @@ export default function ShopPage() {
   return (
     <main className="min-h-[calc(100vh-64px)] bg-gray-100 p-6">
       <div className="mx-auto max-w-4xl space-y-6">
-        <section className="rounded-lg bg-white p-6 shadow-sm">
-          <Link className="mb-5 inline-block text-sm font-medium text-amber-700 hover:text-amber-800" to="/">
-            Back to shops
+
+        {/* Shop Details */}
+        <section className="bg-white rounded-lg shadow-sm p-6">
+
+          <Link
+            to="/"
+            className="inline-block mb-4 text-amber-700 font-medium"
+          >
+            ← Back
           </Link>
 
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{shop.name}</h1>
-              <p className="mt-2 text-gray-600">{shop.address}</p>
+              <h1 className="text-3xl font-bold">
+                {shop.name}
+              </h1>
+
+              <p className="mt-2 text-gray-600">
+                {shop.address}
+              </p>
             </div>
 
-            <div className="rounded-md bg-yellow-100 px-4 py-3 text-yellow-800">
-              <p className="text-sm font-medium">Average rating</p>
+            <div className="bg-yellow-100 rounded-lg px-4 py-3">
+              <p className="text-sm">Average Rating</p>
+
               <p className="text-xl font-semibold">
-                {averageRating} ({shop.totalRatings ?? 0})
+                ⭐ {averageRating} ({shop.totalRatings})
               </p>
             </div>
           </div>
 
-          <p className="mt-6 leading-7 text-gray-700">
-            {shop.description || "No description available."}
+          <p className="mt-6 text-gray-700">
+            {shop.description}
           </p>
         </section>
 
-        <section className="rounded-lg bg-white p-6 shadow-sm">
-          <h2 className="text-2xl font-semibold text-gray-900">Reviews</h2>
+        {/* Review Button */}
+        <section className="bg-white rounded-lg shadow-sm p-6">
 
-          {reviews.length === 0 ? (
-            <p className="mt-4 text-gray-600">No reviews yet.</p>
-          ) : (
-            <div className="mt-5 space-y-4">
-              {reviews.map((review) => (
-                <article
-                  className="rounded-lg border border-gray-200 p-4"
-                  key={review._id}
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
-                        {review.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">{review.email}</p>
-                    </div>
+          <div className="flex justify-between items-center mb-5">
 
-                    <span className="w-fit rounded bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
-                      {formatRating(review.rating)}
-                    </span>
-                  </div>
+            <h2 className="text-2xl font-semibold">
+              Reviews
+            </h2>
 
-                  <p className="mt-3 leading-6 text-gray-700">
-                    {review.description || "No review text added."}
-                  </p>
-                </article>
-              ))}
-            </div>
+            <button
+              onClick={() => setShowReviewForm(true)}
+              className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded"
+            >
+              {userReview ? "Edit Review" : "Add Review"}
+            </button>
+
+          </div>
+
+          {showReviewForm && (
+            <ReviewForm
+              shopId={shopId}
+              review={userReview}
+              onClose={() => setShowReviewForm(false)}
+              onSuccess={async () => {
+                setShowReviewForm(false);
+                await fetchShop();
+                await fetchReviews();
+              }}
+            />
           )}
+
+          <ReviewList reviews={reviews} />
+
         </section>
       </div>
     </main>
