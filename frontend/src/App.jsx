@@ -30,7 +30,7 @@ function App() {
   return (
     <>
       <Navbar />
-      <Toaster position="top-right" />
+      <Toaster position="top-center" />
 
       <Routes>
         {/* Public */}

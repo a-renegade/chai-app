@@ -123,12 +123,14 @@ export default function ShopPage() {
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-2xl font-semibold">Reviews</h2>
 
-            <button
-              onClick={() => setShowReviewForm(true)}
-              className="rounded bg-amber-600 px-4 py-2 text-white hover:bg-amber-700"
-            >
-              {userReview ? "Edit Review" : "Add Review"}
-            </button>
+            {!showReviewForm && (
+              <button
+                onClick={() => setShowReviewForm(true)}
+                className="rounded bg-amber-600 px-4 py-2 text-white hover:bg-amber-700"
+              >
+                {userReview ? "Edit Review" : "Add Review"}
+              </button>
+            )}
           </div>
 
           {showReviewForm && (
