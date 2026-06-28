@@ -6,14 +6,8 @@ import toast from "react-hot-toast";
 const ReviewForm = ({ shopId, review, onClose, onSuccess }) => {
   const { authUser, fullName } = useAuthStore();
 
-  const [description, setDescription] = useState(
-    review?.description || ""
-  );
-
-  const [rating, setRating] = useState(
-    review?.rating || 5
-  );
-
+  const [description, setDescription] = useState(review?.description || "");
+  const [rating, setRating] = useState(review?.rating || 5);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -34,7 +28,7 @@ const ReviewForm = ({ shopId, review, onClose, onSuccess }) => {
       } else {
         await axiosInstance.post("/review", {
           email: authUser,
-          name: fullName,
+          name: fullName || authUser,
           description,
           rating: Number(rating),
           shop: shopId,
@@ -45,9 +39,7 @@ const ReviewForm = ({ shopId, review, onClose, onSuccess }) => {
 
       await onSuccess();
     } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Something went wrong."
-      );
+      toast.error(err.response?.data?.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -61,27 +53,23 @@ const ReviewForm = ({ shopId, review, onClose, onSuccess }) => {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-2 block font-medium">
-            Rating
-          </label>
+          <label className="mb-2 block font-medium">Rating</label>
 
           <select
             value={rating}
             onChange={(e) => setRating(Number(e.target.value))}
             className="w-full rounded-lg border p-3"
           >
-            <option value={5}>5 ⭐</option>
-            <option value={4}>4 ⭐</option>
-            <option value={3}>3 ⭐</option>
-            <option value={2}>2 ⭐</option>
-            <option value={1}>1 ⭐</option>
+            <option value={5}>5 stars</option>
+            <option value={4}>4 stars</option>
+            <option value={3}>3 stars</option>
+            <option value={2}>2 stars</option>
+            <option value={1}>1 star</option>
           </select>
         </div>
 
         <div>
-          <label className="mb-2 block font-medium">
-            Review
-          </label>
+          <label className="mb-2 block font-medium">Review</label>
 
           <textarea
             rows={5}
@@ -99,11 +87,7 @@ const ReviewForm = ({ shopId, review, onClose, onSuccess }) => {
             disabled={loading}
             className="rounded-lg bg-amber-600 px-5 py-2 text-white hover:bg-amber-700 disabled:opacity-50"
           >
-            {loading
-              ? "Saving..."
-              : review
-              ? "Update Review"
-              : "Add Review"}
+            {loading ? "Saving..." : review ? "Update Review" : "Add Review"}
           </button>
 
           <button

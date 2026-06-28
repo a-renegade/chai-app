@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import toast from "react-hot-toast";
@@ -10,7 +10,7 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [isRedeeming, setIsRedeeming] = useState(false);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -24,13 +24,13 @@ const ProfilePage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authUser]);
 
   useEffect(() => {
     if (authUser) {
       fetchProfile();
     }
-  }, [authUser]);
+  }, [authUser, fetchProfile]);
 
   const handleRedeem = async () => {
     try {

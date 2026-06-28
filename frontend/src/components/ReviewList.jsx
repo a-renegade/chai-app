@@ -24,19 +24,15 @@ const ReviewList = ({ reviews }) => {
           key={review._id}
           className="rounded-lg border border-gray-200 p-4"
         >
-          <div className="flex justify-between items-start">
-            <h3 className="text-lg font-semibold">
-              {review.name}
-            </h3>
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="text-lg font-semibold">{review.name}</h3>
 
             <span className="rounded bg-amber-100 px-3 py-1 font-semibold text-amber-800">
-              ⭐ {formatRating(review.rating)}
+              Rating {formatRating(review.rating)}
             </span>
           </div>
 
-          <p className="mt-3 text-gray-700">
-            {review.description}
-          </p>
+          <p className="mt-3 text-gray-700">{review.description}</p>
         </article>
       ))}
     </div>

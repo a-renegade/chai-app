@@ -2,40 +2,63 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   GoogleMap,
-  LoadScript,
   Marker,
   InfoWindow,
   DirectionsRenderer,
+  useJsApiLoader,
 } from "@react-google-maps/api";
 import { useLocationStore } from "../store/useLocationStore";
 
-const MiniMap = ({ shops }) => {
+const getShopPosition = (shop) => {
+  const lat = Number(shop.latitude);
+  const lng = Number(shop.longitude);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return { lat, lng };
+};
+
+const formatRating = (rating) => {
+  const numericRating = Number(rating);
+
+  if (!Number.isFinite(numericRating) || numericRating <= 0) {
+    return "No ratings";
+  }
+
+  return numericRating.toFixed(1);
+};
+
+const MiniMap = ({ shops = [] }) => {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
-
   const [selectedShop, setSelectedShop] = useState(null);
   const [directions, setDirections] = useState(null);
-
   const [newShopLocation, setNewShopLocation] = useState(null);
   const [showAddPopup, setShowAddPopup] = useState(false);
 
   const { location } = useLocationStore();
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: apiKey || "",
+  });
+
+  const validShops = useMemo(() => {
+    return shops
+      .map((shop) => ({ shop, position: getShopPosition(shop) }))
+      .filter(({ position }) => Boolean(position));
+  }, [shops]);
 
   const center = useMemo(() => {
     if (location) return location;
-
-    if (shops.length > 0) {
-      return {
-        lat: shops[0].latitude,
-        lng: shops[0].longitude,
-      };
-    }
+    if (validShops[0]?.position) return validShops[0].position;
 
     return {
       lat: 20.5937,
       lng: 78.9629,
     };
-  }, [location, shops]);
+  }, [location, validShops]);
 
   const mapOptions = {
     streetViewControl: false,
@@ -44,17 +67,16 @@ const MiniMap = ({ shops }) => {
   };
 
   const getDirections = async () => {
-    if (!location || !selectedShop) return;
+    const destination = selectedShop ? getShopPosition(selectedShop) : null;
+
+    if (!location || !destination || !window.google) return;
 
     const directionsService = new window.google.maps.DirectionsService();
 
     try {
       const result = await directionsService.route({
         origin: location,
-        destination: {
-          lat: selectedShop.latitude,
-          lng: selectedShop.longitude,
-        },
+        destination,
         travelMode: window.google.maps.TravelMode.DRIVING,
       });
 
@@ -64,11 +86,11 @@ const MiniMap = ({ shops }) => {
     }
   };
 
-  const renderMap = (height) => (
+  const renderMap = () => (
     <GoogleMap
       mapContainerStyle={{
         width: "100%",
-        height,
+        height: "100%",
       }}
       center={center}
       zoom={13}
@@ -85,8 +107,7 @@ const MiniMap = ({ shops }) => {
         setShowAddPopup(true);
       }}
     >
-      {/* User Location */}
-      {location && (
+      {location && window.google && (
         <Marker
           position={location}
           icon={{
@@ -100,14 +121,10 @@ const MiniMap = ({ shops }) => {
         />
       )}
 
-      {/* Existing Shop Markers */}
-      {shops.map((shop) => (
+      {validShops.map(({ shop, position }) => (
         <Marker
           key={shop._id}
-          position={{
-            lat: shop.latitude,
-            lng: shop.longitude,
-          }}
+          position={position}
           onClick={() => {
             setShowAddPopup(false);
             setNewShopLocation(null);
@@ -116,38 +133,33 @@ const MiniMap = ({ shops }) => {
         />
       ))}
 
-      {/* Temporary Marker */}
       {newShopLocation && <Marker position={newShopLocation} />}
 
-      {/* Existing Shop Popup */}
-      {selectedShop && (
+      {selectedShop && getShopPosition(selectedShop) && (
         <InfoWindow
-          position={{
-            lat: selectedShop.latitude,
-            lng: selectedShop.longitude,
-          }}
+          position={getShopPosition(selectedShop)}
           onCloseClick={() => setSelectedShop(null)}
         >
           <div className="w-36 p-1">
-            <h3 className="text-sm font-semibold truncate">
+            <h3 className="truncate text-sm font-semibold">
               {selectedShop.name}
             </h3>
 
             <p className="text-xs text-yellow-600">
-              ⭐ {selectedShop.rating}
+              Rating {formatRating(selectedShop.averageRating)}
             </p>
 
-            <div className="flex gap-1 mt-2">
+            <div className="mt-2 flex gap-1">
               <button
                 onClick={getDirections}
-                className="flex-1 text-xs bg-blue-600 text-white rounded px-2 py-1 hover:bg-blue-700"
+                className="flex-1 rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
               >
                 Route
               </button>
 
               <button
                 onClick={() => navigate(`/shop/${selectedShop._id}`)}
-                className="flex-1 text-xs bg-amber-500 text-white rounded px-2 py-1 hover:bg-amber-600"
+                className="flex-1 rounded bg-amber-500 px-2 py-1 text-xs text-white hover:bg-amber-600"
               >
                 More
               </button>
@@ -156,7 +168,6 @@ const MiniMap = ({ shops }) => {
         </InfoWindow>
       )}
 
-      {/* Add Shop Popup */}
       {showAddPopup && newShopLocation && (
         <InfoWindow
           position={newShopLocation}
@@ -166,7 +177,7 @@ const MiniMap = ({ shops }) => {
           }}
         >
           <div className="w-44">
-            <h3 className="font-semibold mb-2">Add a shop here?</h3>
+            <h3 className="mb-2 font-semibold">Add a shop here?</h3>
 
             <button
               className="w-full rounded bg-amber-600 px-3 py-2 text-white hover:bg-amber-700"
@@ -179,13 +190,12 @@ const MiniMap = ({ shops }) => {
                 });
               }}
             >
-              + Add Shop
+              Add Shop
             </button>
           </div>
         </InfoWindow>
       )}
 
-      {/* Directions */}
       {directions && (
         <DirectionsRenderer
           directions={directions}
@@ -201,14 +211,38 @@ const MiniMap = ({ shops }) => {
     </GoogleMap>
   );
 
+  if (!apiKey) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-white p-4 text-center text-sm text-gray-600">
+        Map unavailable: missing Google Maps API key.
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-white p-4 text-center text-sm text-red-600">
+        Map failed to load.
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-white text-sm text-gray-600">
+        Loading map...
+      </div>
+    );
+  }
+
   return (
-    <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
-      <div className="relative h-56 w-80 overflow-hidden rounded-xl shadow-lg">
-        {renderMap("100%")}
+    <>
+      <div className="relative h-full w-full overflow-hidden rounded-xl shadow-lg">
+        {renderMap()}
 
         <button
           onClick={() => setExpanded(true)}
-          className="absolute bottom-3 right-10 rounded-lg bg-white px-2 py-1 shadow-md hover:bg-gray-100"
+          className="absolute bottom-3 right-3 rounded-lg bg-white px-2 py-1 shadow-md hover:bg-gray-100"
         >
           Expand Map
         </button>
@@ -217,18 +251,18 @@ const MiniMap = ({ shops }) => {
       {expanded && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="relative h-[90vh] w-[90vw] overflow-hidden rounded-xl bg-white shadow-2xl">
-            {renderMap("100%")}
+            {renderMap()}
 
             <button
               onClick={() => setExpanded(false)}
-              className="absolute top-4 right-4 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+              className="absolute right-4 top-4 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
             >
               Close
             </button>
           </div>
         </div>
       )}
-    </LoadScript>
+    </>
   );
 };
 
